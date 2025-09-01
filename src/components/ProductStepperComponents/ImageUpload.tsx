@@ -20,7 +20,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productProp, updateProduct, h
     if (file) {
       const newImageUrl = URL.createObjectURL(file); // Create a temporary URL for the uploaded file
       setImageUrls((prevUrls) => [...prevUrls, newImageUrl]); // Add the new URL to the list
-      updateProduct({ ...productProp, images: [...(productProp.images || []), { url: newImageUrl }] });
+      updateProduct({ ...productProp, images: [...(productProp.images || []), {
+        url: newImageUrl,
+        alt: ""
+      }] });
     }
   };
 
@@ -32,7 +35,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productProp, updateProduct, h
   const handleUrlSubmit = () => {
     if (imageUrl.trim() !== "") {
       setImageUrls((prevUrls) => [...prevUrls, imageUrl]); // Add the new URL to the list
-      updateProduct({ ...productProp, images: [...(productProp.images || []), { url: imageUrl }] });
+     updateProduct({
+        ...productProp,
+        images: [...(productProp.images || []), { url: imageUrl, alt: "" }], // Add alt property
+      });
       setImageUrl(""); // Clear the input field
     }
   };
