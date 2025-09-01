@@ -4,6 +4,7 @@ import { Product } from "@/interfaces/product";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useState } from "react";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+
 interface ImageUploadProps {
   productProp: Product;
   updateProduct: (data: Product) => void;
@@ -20,7 +21,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productProp, updateProduct, h
     if (file) {
       const newImageUrl = URL.createObjectURL(file); // Create a temporary URL for the uploaded file
       setImageUrls((prevUrls) => [...prevUrls, newImageUrl]); // Add the new URL to the list
-      updateProduct({ ...productProp, images: [...(productProp.images || []), { url: newImageUrl }] });
+      updateProduct({
+        ...productProp,
+        images: [...(productProp.images || []), { url: newImageUrl, alt: "" }],
+      });
     }
   };
 
@@ -33,7 +37,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productProp, updateProduct, h
   const handleUrlSubmit = () => {
     if (imageUrl.trim() !== "") {
       setImageUrls((prevUrls) => [...prevUrls, imageUrl]); // Add the new URL to the list
-      updateProduct({ ...productProp, images: [...(productProp.images || []), { url: imageUrl }] });
+      updateProduct({
+        ...productProp,
+        images: [...(productProp.images || []), { url: imageUrl, alt: "" }], // Add alt property
+      });
       setImageUrl(""); // Clear the input field
     }
   };
@@ -53,7 +60,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ productProp, updateProduct, h
 
       {/* File Upload */}
       <div className="flex items-center justify-center w-full">
-        <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500">
+        <label
+          htmlFor="dropzone-file"
+          className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-gray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500"
+        >
           <span className="text-sm text-gray-500">Click to upload or drag and drop</span>
           <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} />
         </label>

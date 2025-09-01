@@ -42,6 +42,6 @@ export interface Order {
   orderNotes?: string;
   deliveredAt?: Date;
   waybill?: string;
-  createdAt?: Date;
+  createdAt: Date;
   updatedAt?: Date;
 }

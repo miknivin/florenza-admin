@@ -1,4 +1,6 @@
 export interface Product {
+  stock?: number;
+  actualPrice?: number;
   _id?: any;
   name: string;
   sku: string;
