@@ -6,7 +6,7 @@ export interface Product {
   shortDescription: string;
   features: string[];
   variants: Array<{
-    size: "12ml" | "30ml" | "50ml" | "100ml" | "150ml";
+    size: "12ml" | "20ml"|"30ml" | "50ml" | "100ml" | "150ml";
     price: number;
     discountPrice: number | null;
   }>;

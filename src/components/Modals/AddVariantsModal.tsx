@@ -3,7 +3,7 @@ import React from "react";
 import Swal from "sweetalert2";
 
 interface VariantForm {
-  size: "30ml" | "50ml" | "100ml" | "150ml";
+  size:"12ml"|"20ml"| "30ml" | "50ml" | "100ml" | "150ml";
   price: number;
   discountPrice: number | null;
 }
@@ -76,6 +76,7 @@ const VariantModal: React.FC<VariantModalProps> = ({
             className="w-full rounded border-[1.5px] border-stroke bg-transparent px-4 py-2 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
           >
             <option value="12ml">12ml</option>
+            <option value="20ml">20ml</option>
             <option value="30ml">30ml</option>
             <option value="50ml">50ml</option>
             <option value="100ml">100ml</option>

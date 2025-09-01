@@ -40,7 +40,7 @@ const ProductSchema = new Schema(
         size: {
           type: String,
           required: true,
-          enum: ["12ml", "30ml", "50ml", "100ml", "150ml"], // Restrict to common perfume sizes
+          enum: ["12ml","20ml", "30ml", "50ml", "100ml", "150ml"], // Restrict to common perfume sizes
         },
         price: {
           type: Number,
