@@ -11,6 +11,7 @@ export interface Product {
     size: "12ml" | "20ml"|"30ml" | "50ml" | "100ml" | "150ml";
     price: number;
     discountPrice: number | null;
+    imageUrl?: string[] | [];
   }>;
   stockQuantity: number;
   fragranceNotes: {

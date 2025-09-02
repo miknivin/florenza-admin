@@ -41,6 +41,7 @@ const ProductSchema = new Schema(
           type: String,
           required: true,
           enum: ["12ml","20ml", "30ml", "50ml", "100ml", "150ml"], // Restrict to common perfume sizes
+          
         },
         price: {
           type: Number,
@@ -51,6 +52,10 @@ const ProductSchema = new Schema(
           type: Number,
           min: 0,
           default: null,
+        },
+         imageUrl: {
+         type: [{ type: String }],
+         default: [], // Allow null for variants without specific images
         },
       },
     ],

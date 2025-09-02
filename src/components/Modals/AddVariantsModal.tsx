@@ -1,11 +1,14 @@
 "use client";
 import React from "react";
 import Swal from "sweetalert2";
+import { useImageUploadMutation } from "@/redux/api/productsApi";
 
 interface VariantForm {
-  size:"12ml"|"20ml"| "30ml" | "50ml" | "100ml" | "150ml";
+  size: "12ml" | "20ml" | "30ml" | "50ml" | "100ml" | "150ml";
   price: number;
   discountPrice: number | null;
+  imageUrls?: string[] | null;
+  imageFiles?: File[] | null;
 }
 
 interface VariantModalProps {
@@ -13,7 +16,8 @@ interface VariantModalProps {
   closeModal: () => void;
   variantForm: VariantForm;
   setVariantForm: React.Dispatch<React.SetStateAction<VariantForm>>;
-  saveVariant: () => void;
+  saveVariant: (variant: VariantForm) => void;
+  productId: string;
 }
 
 const VariantModal: React.FC<VariantModalProps> = ({
@@ -22,9 +26,12 @@ const VariantModal: React.FC<VariantModalProps> = ({
   variantForm,
   setVariantForm,
   saveVariant,
+  productId,
 }) => {
+  const [imageUpload, { isLoading }] = useImageUploadMutation();
+
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
     setVariantForm({
@@ -33,17 +40,43 @@ const VariantModal: React.FC<VariantModalProps> = ({
     });
   };
 
-  const handleSave = () => {
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const newFiles = e.target.files ? Array.from(e.target.files) : [];
+  const existingFiles = variantForm.imageFiles || [];
+  const mergedFiles = [...existingFiles, ...newFiles].slice(0, 5); // limit to 5
+
+  const newUrls = newFiles.map((file) => URL.createObjectURL(file));
+  const existingUrls = variantForm.imageUrls || [];
+  const mergedUrls = [...existingUrls, ...newUrls].slice(0, 5); // limit to 5
+
+  setVariantForm({
+    ...variantForm,
+    imageFiles: mergedFiles,
+    imageUrls: mergedUrls,
+  });
+};
+
+
+  const handleSave = async () => {
     const errors: string[] = [];
-    if (!variantForm.size) {
-      errors.push("Size is required.");
-    }
-    if (variantForm.price <= 0) {
-      errors.push("Price must be greater than 0.");
-    }
-    if (variantForm.discountPrice && variantForm.discountPrice < 0) {
+    if (!variantForm.size) errors.push("Size is required.");
+    if (variantForm.price <= 0) errors.push("Price must be greater than 0.");
+    if (variantForm.discountPrice && variantForm.discountPrice < 0)
       errors.push("Discount price cannot be negative.");
-    }
+    if (
+      variantForm.imageFiles &&
+      variantForm.imageFiles.some(
+        (file) => !["image/jpeg", "image/png", "image/webp"].includes(file.type)
+      )
+    )
+      errors.push("Only JPEG, PNG, or WebP images are allowed.");
+    if (
+      variantForm.imageFiles &&
+      variantForm.imageFiles.some((file) => file.size > 5 * 1024 * 1024)
+    )
+      errors.push("Each image must be less than 5MB.");
+    if (variantForm.imageFiles && variantForm.imageFiles.length > 5)
+      errors.push("Maximum 5 images allowed per variant.");
 
     if (errors.length > 0) {
       Swal.fire({
@@ -54,7 +87,50 @@ const VariantModal: React.FC<VariantModalProps> = ({
       return;
     }
 
-    saveVariant();
+    let uploadedImageUrls: string[] = [];
+    if (variantForm.imageFiles && variantForm.imageFiles.length > 0) {
+      try {
+        // Upload each image
+        uploadedImageUrls = await Promise.all(
+          variantForm.imageFiles.map(async (file) => {
+            const uploadResult = await imageUpload({
+              fileName: file.name,
+              fileType: file.type,
+              productId,
+            }).unwrap();
+
+            const uploadResponse = await fetch(uploadResult.presignedUrl, {
+              method: "PUT",
+              body: file,
+              headers: { "Content-Type": file.type },
+            });
+
+            if (!uploadResponse.ok) {
+              throw new Error(`Image upload failed for ${file.name}`);
+            }
+
+            return uploadResult.finalUrl;
+          })
+        );
+        console.log("Uploaded image URLs:", uploadedImageUrls); // Debug log
+      } catch (error) {
+        Swal.fire({
+          title: "Upload Error",
+          text: error instanceof Error ? error.message : "Unknown error",
+          icon: "error",
+        });
+        return;
+      }
+    }
+
+    const updatedVariantForm = {
+      ...variantForm,
+      imageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : variantForm.imageUrls || [],
+      imageFiles: null,
+    };
+    setVariantForm(updatedVariantForm);
+    console.log("Updated variantForm:", updatedVariantForm); // Debug log
+    saveVariant(updatedVariantForm);
   };
 
   if (!isOpen) return null;
@@ -109,11 +185,41 @@ const VariantModal: React.FC<VariantModalProps> = ({
             className="w-full rounded border-[1.5px] border-stroke bg-transparent px-4 py-2 text-black outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
           />
         </div>
+        <div className="mb-4">
+          <label
+            className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+            htmlFor="file_input"
+          >
+            Variant Images (optional, up to 5)
+          </label>
+          <input
+            className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400"
+            id="file_input"
+            type="file"
+            name="imageFiles"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            onChange={handleFileChange}
+          />
+          {variantForm.imageUrls && variantForm.imageUrls.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {variantForm.imageUrls.map((url, index) => (
+                <img
+                  key={index}
+                  src={url}
+                  alt={`Variant Preview ${index + 1}`}
+                  className="h-24 w-24 object-cover rounded"
+                />
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex justify-end gap-2">
           <button
             type="button"
             onClick={closeModal}
             className="rounded bg-gray-300 px-4 py-2 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700"
+            disabled={isLoading}
           >
             Cancel
           </button>
@@ -121,8 +227,9 @@ const VariantModal: React.FC<VariantModalProps> = ({
             type="button"
             onClick={handleSave}
             className="rounded bg-primary px-4 py-2 text-white hover:bg-opacity-90"
+            disabled={isLoading}
           >
-            Save
+            {isLoading ? "Uploading..." : "Save"}
           </button>
         </div>
       </div>

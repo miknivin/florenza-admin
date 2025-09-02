@@ -6,17 +6,19 @@ import Swal from "sweetalert2";
 import { validateForm } from "@/utlis/validation/productValidators/basicDetails";
 import VariantModal from "../Modals/AddVariantsModal";
 
+interface VariantForm {
+  size: "12ml" | "20ml" | "30ml" | "50ml" | "100ml" | "150ml";
+  price: number;
+  discountPrice: number | null;
+  imageUrls?: string[] | null;
+  imageFiles?: File[] | null;
+}
+
 interface BasicDetailsProps {
   productProp: Product;
   updateProduct: (data: Partial<Product>) => void;
   handleNextStep: () => void;
   isUpdate?: boolean;
-}
-
-interface VariantForm {
-  size: "12ml" |  "20ml"|"30ml" | "50ml" | "100ml" | "150ml";
-  price: number;
-  discountPrice: number | null;
 }
 
 const BasicDetails: React.FC<BasicDetailsProps> = ({
@@ -31,11 +33,13 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
     size: "12ml",
     price: 0,
     discountPrice: null,
+    imageUrls: null,
+    imageFiles: null,
   });
   const [editIndex, setEditIndex] = useState<number | null>(null);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
     const updatedProduct = {
@@ -64,10 +68,18 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
         size: variant.size,
         price: variant.price,
         discountPrice: variant.discountPrice,
+        imageUrls: variant.imageUrl || null,
+        imageFiles: null,
       });
       setEditIndex(index);
     } else {
-      setVariantForm({ size: "12ml", price: 0, discountPrice: null });
+      setVariantForm({
+        size: "12ml",
+        price: 0,
+        discountPrice: null,
+        imageUrls: null,
+        imageFiles: null,
+      });
       setEditIndex(null);
     }
     setIsModalOpen(true);
@@ -76,29 +88,28 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
   const closeModal = () => {
     setIsModalOpen(false);
     setEditIndex(null);
-    setVariantForm({ size: "12ml", price: 0, discountPrice: null });
+    setVariantForm({
+      size: "12ml",
+      price: 0,
+      discountPrice: null,
+      imageUrls: null,
+      imageFiles: null,
+    });
   };
 
-  const saveVariant = () => {
+  const saveVariant = (variant: VariantForm) => {
     const errors: string[] = [];
-    if (!variantForm.size) {
-      errors.push("Size is required.");
-    }
-    if (variantForm.price <= 0) {
-      errors.push("Price must be greater than 0.");
-    }
-    if (variantForm.discountPrice && variantForm.discountPrice < 0) {
+    if (!variant.size) errors.push("Size is required.");
+    if (variant.price <= 0) errors.push("Price must be greater than 0.");
+    if (variant.discountPrice && variant.discountPrice < 0)
       errors.push("Discount price cannot be negative.");
-    }
     if (
       productState.variants.some(
         (v, i) =>
-          v.size === variantForm.size &&
-          (editIndex === null || i !== editIndex),
+          v.size === variant.size && (editIndex === null || i !== editIndex)
       )
-    ) {
+    )
       errors.push("Size must be unique among variants.");
-    }
 
     if (errors.length > 0) {
       Swal.fire({
@@ -111,9 +122,19 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
 
     const updatedVariants = [...productState.variants];
     if (editIndex !== null) {
-      updatedVariants[editIndex] = variantForm;
+      updatedVariants[editIndex] = {
+        size: variant.size,
+        price: variant.price,
+        discountPrice: variant.discountPrice,
+        imageUrl: variant.imageUrls || [], // Use empty array as default
+      };
     } else {
-      updatedVariants.push(variantForm);
+      updatedVariants.push({
+        size: variant.size,
+        price: variant.price,
+        discountPrice: variant.discountPrice,
+        imageUrl: variant.imageUrls || [],
+      });
     }
 
     const updatedProduct = { ...productState, variants: updatedVariants };
@@ -139,6 +160,7 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Submitting product:", JSON.stringify(productState, null, 2)); // Debug log
     const { isValid, errors } = validateForm(productState);
 
     if (!isValid) {
@@ -283,6 +305,7 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
         </div>
       </form>
       <VariantModal
+        productId={productState._id || Date.now().toString()}
         isOpen={isModalOpen}
         closeModal={closeModal}
         variantForm={variantForm}

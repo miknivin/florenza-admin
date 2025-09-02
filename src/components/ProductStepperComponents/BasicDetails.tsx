@@ -279,6 +279,7 @@ const BasicDetails: React.FC<BasicDetailsProps> = ({
         </div>
       </form>
       <VariantModal
+      productId={Date.now().toString()} // Pass a dummy productId or modify as needed
         isOpen={isModalOpen}
         closeModal={closeModal}
         variantForm={variantForm}
