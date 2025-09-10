@@ -1,7 +1,9 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
-import React from "react";
+import React, { useEffect } from "react";
 import Swal from "sweetalert2";
-import { useImageUploadMutation } from "@/redux/api/productsApi";
+import { useImageUploadMutation, useDeleteProductImageMutation } from "@/redux/api/productsApi";
+import GraySpinner from "@/components/common/GraySpinner";
 
 interface VariantForm {
   size: "12ml" | "20ml" | "30ml" | "50ml" | "100ml" | "150ml";
@@ -9,6 +11,7 @@ interface VariantForm {
   discountPrice: number | null;
   imageUrls?: string[] | null;
   imageFiles?: File[] | null;
+  imageIds?: string[] | null; // Added to track image IDs
 }
 
 interface VariantModalProps {
@@ -29,6 +32,18 @@ const VariantModal: React.FC<VariantModalProps> = ({
   productId,
 }) => {
   const [imageUpload, { isLoading }] = useImageUploadMutation();
+  const [deleteProductImage, { isLoading: isDeleting }] = useDeleteProductImageMutation();
+
+  // Cleanup preview URLs to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (variantForm.imageUrls) {
+        variantForm.imageUrls.forEach((url) => {
+          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        });
+      }
+    };
+  }, [variantForm.imageUrls]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -40,22 +55,72 @@ const VariantModal: React.FC<VariantModalProps> = ({
     });
   };
 
-const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const newFiles = e.target.files ? Array.from(e.target.files) : [];
-  const existingFiles = variantForm.imageFiles || [];
-  const mergedFiles = [...existingFiles, ...newFiles].slice(0, 5); // limit to 5
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFiles = e.target.files ? Array.from(e.target.files) : [];
+    if (newFiles.length === 0) return;
 
-  const newUrls = newFiles.map((file) => URL.createObjectURL(file));
-  const existingUrls = variantForm.imageUrls || [];
-  const mergedUrls = [...existingUrls, ...newUrls].slice(0, 5); // limit to 5
+    const existingFiles = variantForm.imageFiles || [];
+    const existingUrls = variantForm.imageUrls || [];
+    const existingIds = variantForm.imageIds || [];
 
-  setVariantForm({
-    ...variantForm,
-    imageFiles: mergedFiles,
-    imageUrls: mergedUrls,
-  });
-};
+    // Filter out blob URLs from existingUrls to avoid duplicating previews
+    const persistentUrls = existingUrls.filter((url) => !url.startsWith("blob:"));
+    const persistentFiles = existingFiles.filter((_, i) => !existingUrls[i].startsWith("blob:"));
+    const persistentIds = existingIds.filter((_, i) => !existingUrls[i].startsWith("blob:"));
 
+    const newUrls = newFiles.map((file) => URL.createObjectURL(file));
+    const mergedFiles = [...persistentFiles, ...newFiles].slice(0, 5); // Limit to 5
+    const mergedUrls = [...persistentUrls, ...newUrls].slice(0, 5); // Limit to 5
+    const mergedIds = [...persistentIds].slice(0, 5); // Preserve existing IDs
+
+    setVariantForm({
+      ...variantForm,
+      imageFiles: mergedFiles,
+      imageUrls: mergedUrls,
+      imageIds: mergedIds,
+    });
+  };
+
+  const handleDelete = async (index: number, imageId?: string) => {
+    try {
+      // If imageId exists, delete from server
+      if (imageId) {
+        await deleteProductImage({
+          id: productId,
+          body: { imageId },
+        }).unwrap();
+        Swal.fire({
+          title: "Success",
+          text: "Image deleted successfully!",
+          icon: "success",
+        });
+      }
+
+      // Remove from local state
+      const updatedUrls = (variantForm.imageUrls || []).filter((_, i) => i !== index);
+      const updatedFiles = (variantForm.imageFiles || []).filter((_, i) => i !== index);
+      const updatedIds = (variantForm.imageIds || []).filter((_, i) => i !== index);
+
+      // Revoke blob URL if it exists
+      if (variantForm.imageUrls?.[index]?.startsWith("blob:")) {
+        URL.revokeObjectURL(variantForm.imageUrls[index]);
+      }
+
+      setVariantForm({
+        ...variantForm,
+        imageUrls: updatedUrls,
+        imageFiles: updatedFiles,
+        imageIds: updatedIds,
+      });
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      Swal.fire({
+        title: "Error",
+        text: "Failed to delete image.",
+        icon: "error",
+      });
+    }
+  };
 
   const handleSave = async () => {
     const errors: string[] = [];
@@ -88,10 +153,11 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     }
 
     let uploadedImageUrls: string[] = [];
+    let uploadedImageIds: string[] = [];
     if (variantForm.imageFiles && variantForm.imageFiles.length > 0) {
       try {
         // Upload each image
-        uploadedImageUrls = await Promise.all(
+        const uploadResults = await Promise.all(
           variantForm.imageFiles.map(async (file) => {
             const uploadResult = await imageUpload({
               fileName: file.name,
@@ -109,9 +175,12 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
               throw new Error(`Image upload failed for ${file.name}`);
             }
 
-            return uploadResult.finalUrl;
+            return { finalUrl: uploadResult.finalUrl, imageId: uploadResult.imageId || "" };
           })
         );
+
+        uploadedImageUrls = uploadResults.map((result) => result.finalUrl);
+        uploadedImageIds = uploadResults.map((result) => result.imageId);
         console.log("Uploaded image URLs:", uploadedImageUrls); // Debug log
       } catch (error) {
         Swal.fire({
@@ -123,11 +192,23 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       }
     }
 
+    // Combine existing uploaded URLs with new ones, excluding blob URLs
+    const existingUrls = (variantForm.imageUrls || []).filter((url) => !url.startsWith("blob:"));
+    const existingIds = variantForm.imageIds || [];
     const updatedVariantForm = {
       ...variantForm,
-      imageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : variantForm.imageUrls || [],
+      imageUrls: [...existingUrls, ...uploadedImageUrls].slice(0, 5),
+      imageIds: [...existingIds, ...uploadedImageIds].slice(0, 5),
       imageFiles: null,
     };
+
+    // Revoke blob URLs
+    if (variantForm.imageUrls) {
+      variantForm.imageUrls.forEach((url) => {
+        if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+      });
+    }
+
     setVariantForm(updatedVariantForm);
     console.log("Updated variantForm:", updatedVariantForm); // Debug log
     saveVariant(updatedVariantForm);
@@ -204,12 +285,21 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           {variantForm.imageUrls && variantForm.imageUrls.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {variantForm.imageUrls.map((url, index) => (
-                <img
-                  key={index}
-                  src={url}
-                  alt={`Variant Preview ${index + 1}`}
-                  className="h-24 w-24 object-cover rounded"
-                />
+                <div className="relative w-fit" key={index}>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(index, variantForm.imageIds?.[index])}
+                    disabled={isDeleting || variantForm.imageUrls!.length <= 1}
+                    className="badge badge-error badge-sm absolute right-0 top-0 z-30 h-auto rounded-full !p-1"
+                  >
+                    {isDeleting ? <GraySpinner /> : "✖"}
+                  </button>
+                  <img
+                    src={url}
+                    alt={`Variant Preview ${index + 1}`}
+                    className="h-24 w-24 object-cover rounded mask mask-squircle"
+                  />
+                </div>
               ))}
             </div>
           )}
@@ -219,7 +309,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             type="button"
             onClick={closeModal}
             className="rounded bg-gray-300 px-4 py-2 text-black hover:bg-gray-400 dark:bg-gray-600 dark:text-white dark:hover:bg-gray-700"
-            disabled={isLoading}
+            disabled={isLoading || isDeleting}
           >
             Cancel
           </button>
@@ -227,7 +317,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             type="button"
             onClick={handleSave}
             className="rounded bg-primary px-4 py-2 text-white hover:bg-opacity-90"
-            disabled={isLoading}
+            disabled={isLoading || isDeleting}
           >
             {isLoading ? "Uploading..." : "Save"}
           </button>
