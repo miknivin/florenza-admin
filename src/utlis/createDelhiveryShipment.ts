@@ -1,7 +1,7 @@
 import axios from "axios";
 import qs from "qs";
 
-async function createDelhiveryShipment(token, shipmentData) {
+async function createDelhiveryShipment(token: any, shipmentData: any) {
   // Input validation
   if (!token || typeof token !== "string") {
     throw new Error("Invalid or missing Delhivery API token");
@@ -81,7 +81,7 @@ async function createDelhiveryShipment(token, shipmentData) {
     }
 
     return responseData;
-  } catch (error) {
+  } catch (error: any) {
     // Log error
     console.error(
       `Failed to create shipment for order ${shipmentData.shipments[0]?.order}: ${error.message}`,
