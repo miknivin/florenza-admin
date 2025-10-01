@@ -1,7 +1,7 @@
 import axios from "axios";
 
 
-async function trackDelhiveryShipment(_token: string, waybill: string, refIds = "ORD1243244") {
+async function trackDelhiveryShipment( waybill: string, refIds = "ORD1243244") {
   // Call your backend API route instead of Delhivery directly
   try {
     const response = await axios.get("/api/delhivery-status", {

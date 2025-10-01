@@ -147,6 +147,27 @@ export const orderApi = createApi({
         }
       },
     }),
+    createDelhiveryOrder: builder.mutation({
+      query: (orderId) => ({
+        url: `/orders/create-delhivery/${orderId}`,
+        method: "POST",
+      }),
+      invalidatesTags: ["Order", "AdminOrders"], // Refresh order details and admin orders
+      transformResponse: (response) => ({
+        success: response.success,
+        message: response.message,
+        waybill: response.waybill,
+      }),
+      onQueryStarted: async (orderId, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          // Handle successful Delhivery order creation if needed
+          console.log(`Delhivery order created: ${data.waybill}`);
+        } catch (error) {
+          console.error("Error creating Delhivery order:", error);
+        }
+      },
+    }),
   }),
 });
 
@@ -169,4 +190,5 @@ export const {
   useGetSessionStartedOrderByIdQuery,
   useDeleteSessionOrderByIdMutation,
   useSearchSessionStartedOrdersQuery,
+  useCreateDelhiveryOrderMutation,
 } = orderApi;

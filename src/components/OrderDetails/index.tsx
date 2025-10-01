@@ -17,7 +17,6 @@ interface OrderDetailsProps {
 }
 
 export default function OrderDetails({ orderId }: OrderDetailsProps) {
-  
   const { data, error, isLoading } = useOrderDetailsQuery(orderId);
   const [orderDetails, setOrderDetails] = useState<Order | null>(null);
 
@@ -35,10 +34,10 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
   useEffect(() => {
     const fetchAndUpdateStatus = async () => {
       if (!orderDetails || !orderDetails.waybill) return;
-      const token = "92d9fb0b45c01af6f36edf651fa5869da0107b72";
       try {
-        const trackResult = await trackDelhiveryShipment(token, orderDetails.waybill);
-        const shipmentStatus = trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status;
+        const trackResult = await trackDelhiveryShipment(orderDetails.waybill);
+        const shipmentStatus =
+          trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status;
         if (shipmentStatus) {
           setDelhiveryStatus(shipmentStatus);
           setDelhiveryError(false);
@@ -83,6 +82,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
         orderId={orderDetails._id}
         orderStatus={orderDetails.orderStatus}
         delhiveryStatus={delhiveryStatus}
+        showCreateDelhiveryLink={!orderDetails.waybill}
         delhiveryError={delhiveryError || !orderDetails.waybill}
       />
       <div className="mt-10 flex w-full flex-col items-stretch justify-center space-y-4 md:space-y-6 xl:flex-row xl:space-x-8 xl:space-y-0">
@@ -92,7 +92,11 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
               Customer’s Cart
             </p>
             {orderDetails.orderItems.map((product, index) => (
-              <ProductItem key={index} product={product} waybill={orderDetails.waybill} />
+              <ProductItem
+                key={index}
+                product={product}
+                waybill={orderDetails.waybill}
+              />
             ))}
           </div>
           <div className="flex w-full flex-col items-stretch justify-center space-y-4 md:flex-row md:space-x-6 md:space-y-0 xl:space-x-8">
