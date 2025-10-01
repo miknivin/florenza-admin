@@ -6,7 +6,7 @@ import {
 } from "@/redux/api/orderApi";
 import { Order } from "@/types/order";
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Parser } from "json2csv";
 import PaginationComponent from "@/utlis/pagination/PaginationComponent";
 import PreviewIcon from "../SvgIcons/PreviewIcon";
@@ -15,6 +15,25 @@ import ReusableAlert from "@/utlis/alerts/ReusableAlert";
 import toast from "react-hot-toast";
 import SearchInput from "@/utlis/search/SearchInput";
 import Download from "../SvgIcons/Download";
+import axios from "axios";
+
+async function trackDelhiveryShipment(
+  waybill: any,
+  refIds: any = "ORD1243244",
+): Promise<any> {
+  // Call your backend API route instead of Delhivery directly
+  try {
+    const response = await axios.get("/api/delhivery-status", {
+      params: {
+        waybill,
+        ref_ids: refIds,
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    throw new Error(`Failed to track shipment: ${error.message}`);
+  }
+}
 
 const OrderTable = () => {
   // Define all hooks at the top
@@ -26,6 +45,47 @@ const OrderTable = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [orderStatuses, setOrderStatuses] = useState<{ [key: string]: string }>(
+    {},
+  );
+
+  // Fetch and update statuses for all orders
+  useEffect(() => {
+    const fetchAndUpdateStatus = async () => {
+      if (!data?.orders || data.orders.length === 0) return;
+
+      const statusPromises = data.orders.map(async (order: Order) => {
+        if (!order.waybill) {
+          return { orderId: order._id, status: order.orderStatus, error: true };
+        }
+        try {
+          const trackResult = await trackDelhiveryShipment(order.waybill);
+          const shipmentStatus =
+            trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status ||
+            order.orderStatus;
+          return { orderId: order._id, status: shipmentStatus, error: false };
+        } catch (error) {
+          return { orderId: order._id, status: order.orderStatus, error: true };
+        }
+      });
+
+      try {
+        const results = await Promise.all(statusPromises);
+        const newStatuses = results.reduce(
+          (acc: { [key: string]: string }, result) => {
+            acc[result.orderId] = result.status;
+            return acc;
+          },
+          {},
+        );
+        setOrderStatuses(newStatuses);
+      } catch (error) {
+        console.error("Error fetching statuses:", error);
+      }
+    };
+
+    fetchAndUpdateStatus();
+  }, [data?.orders]);
 
   // Handle search input
   const handleSearch = (query: string) => {
@@ -81,7 +141,10 @@ const OrderTable = () => {
       { label: "Zip Code", value: "shippingInfo.zipCode" },
       { label: "Total Amount", value: "totalAmount" },
       { label: "Payment Method", value: "paymentMethod" },
-      { label: "Order Status", value: "orderStatus" },
+      {
+        label: "Order Status",
+        value: (order: Order) => orderStatuses[order._id] || order.orderStatus,
+      },
       { label: "Date", value: "createdAt" },
     ];
 
@@ -211,7 +274,9 @@ const OrderTable = () => {
                   {order.shippingInfo.fullName || "N/A"}
                 </td>
                 <td className="px-6 py-4 text-center">₹{order.totalAmount}</td>
-                <td className="px-6 py-4 text-center">{order.orderStatus}</td>
+                <td className="px-6 py-4 text-center">
+                  {orderStatuses[order._id] || order.orderStatus}
+                </td>
                 <td className="px-6 py-4 text-center">
                   {new Date(order.createdAt).toLocaleDateString("en-GB", {
                     day: "2-digit",
