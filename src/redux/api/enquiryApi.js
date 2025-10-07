@@ -5,13 +5,6 @@ export const enquiryApi = createApi({
   reducerPath: "enquiryApi",
   baseQuery: fetchBaseQuery({
     baseUrl: "/api",
-    prepareHeaders: (headers) => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
-      return headers;
-    },
   }),
   tagTypes: ["Enquiries"],
   endpoints: (builder) => ({
@@ -19,11 +12,17 @@ export const enquiryApi = createApi({
       query: () => "/enquiries",
       providesTags: ["Enquiries"],
       transformResponse: (response) => {
-        console.log("Raw API Response:", response);
-        return { enquiries: response.data }; // Adjust based on response
+        return { enquiries: response.data }; 
       },
+    }),
+    deleteEnquiry: builder.mutation({
+      query: (id) => ({
+        url: `/enquiries/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: ["Enquiries"],
     }),
   }),
 });
 
-export const { useGetEnquiriesQuery } = enquiryApi;
+export const { useGetEnquiriesQuery, useDeleteEnquiryMutation } = enquiryApi;

@@ -251,6 +251,9 @@ const OrderTable = () => {
                 Status
               </th>
               <th scope="col" className="px-6 py-3 text-center">
+                Payment method
+              </th>
+              <th scope="col" className="px-6 py-3 text-center">
                 Date
               </th>
               <th scope="col" className="px-6 py-3 text-center">
@@ -276,6 +279,9 @@ const OrderTable = () => {
                 <td className="px-6 py-4 text-center">₹{order.totalAmount}</td>
                 <td className="px-6 py-4 text-center">
                   {orderStatuses[order._id] || order.orderStatus}
+                </td>
+                <td className="px-6 py-4 text-center">
+                  {order?.paymentMethod}
                 </td>
                 <td className="px-6 py-4 text-center">
                   {new Date(order.createdAt).toLocaleDateString("en-GB", {

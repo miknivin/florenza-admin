@@ -59,7 +59,6 @@ const userSchema = new mongoose.Schema(
 );
 
 // Explicitly create an index on the email field
-userSchema.index({ email: 1 }, { unique: true, sparse: true });
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

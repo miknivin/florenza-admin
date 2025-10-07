@@ -123,7 +123,37 @@ const orderSchema = new mongoose.Schema(
     waybill: {
       type: String,
       required: false,
+      unique: true,
+      sparse: true, // Allow null/undefined values
     },
+    invoiceURL: {
+      type: String,
+      required: false,
+    },
+    orderTracking: [
+      {
+        Status: {
+          type: String,
+          required: false,
+        },
+        StatusDateTime: {
+          type: Date,
+          required: false,
+        },
+        StatusType: {
+          type: String,
+          required: false,
+        },
+        StatusLocation: {
+          type: String,
+          required: false,
+        },
+        Instructions: {
+          type: String,
+          required: false,
+        },
+      },
+    ],
     deliveredAt: Date,
   },
   { timestamps: true },

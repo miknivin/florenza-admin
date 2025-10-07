@@ -1,18 +1,29 @@
 "use client";
 import Spinner from "@/components/common/Spinner/index";
-import { useGetEnquiriesQuery } from "@/redux/api/enquiryApi";
+import {
+  useGetEnquiriesQuery,
+  useDeleteEnquiryMutation,
+} from "@/redux/api/enquiryApi";
 import { Enquiry } from "@/types/enquiry";
 import { useState, useMemo } from "react";
 import PaginationComponent from "@/utlis/pagination/PaginationComponent";
 import SearchInput from "@/utlis/search/SearchInput";
+import ReusableModal from "../Modals/ReusableModal";
+import ReusableAlert from "@/utlis/alerts/ReusableAlert";
+import DeleteIcon from "../SvgIcons/DeleteIcon";
+import toast from "react-hot-toast";
 
 const EnquiriesTable = () => {
   const { data, isLoading, isError } = useGetEnquiriesQuery({});
+  const [deleteEnquiry, { isLoading: isDeleting }] = useDeleteEnquiryMutation();
   console.log("API Data:", data); // Debug: Log the API response
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [currentEnquiry, setCurrentEnquiry] = useState<Enquiry | null>(null);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -52,6 +63,38 @@ const EnquiriesTable = () => {
   const handleItemsPerPageChange = (value: number) => {
     setItemsPerPage(value);
     setCurrentPage(1);
+  };
+
+  const openMessageModal = (enquiry: Enquiry) => {
+    setCurrentEnquiry(enquiry);
+    setIsMessageModalOpen(true);
+  };
+
+  const closeMessageModal = () => {
+    setCurrentEnquiry(null);
+    setIsMessageModalOpen(false);
+  };
+
+  const openDeleteModal = (enquiry: Enquiry) => {
+    setCurrentEnquiry(enquiry);
+    setIsDeleteModalOpen(true);
+  };
+
+  const closeDeleteModal = () => {
+    setCurrentEnquiry(null);
+    setIsDeleteModalOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!currentEnquiry) return;
+    try {
+      await deleteEnquiry(currentEnquiry._id).unwrap();
+      toast.success("Enquiry deleted successfully");
+      closeDeleteModal();
+    } catch (error) {
+      toast.error("Error deleting enquiry");
+      console.error("Failed to delete enquiry:", error);
+    }
   };
 
   if (isLoading) {
@@ -113,6 +156,9 @@ const EnquiriesTable = () => {
               <th className="min-w-[220px] px-4 py-4 font-medium text-black dark:text-white">
                 Message
               </th>
+              <th className="px-4 py-4 font-medium text-black dark:text-white">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -140,10 +186,26 @@ const EnquiriesTable = () => {
                     {enquiry?.phone || "N/A"}
                   </p>
                 </td>
-                <td className="border-b border-[#eee] px-4 py-5 dark:border-strokedark">
-                  <p className="text-black dark:text-white truncate max-w-[200px]">
+                <td
+                  className="cursor-pointer border-b border-[#eee] px-4 py-5 hover:bg-gray-100 dark:border-strokedark dark:hover:bg-gray-700"
+                  onClick={() => openMessageModal(enquiry)}
+                >
+                  <p className="max-w-[200px] truncate text-black dark:text-white">
                     {enquiry.message}
                   </p>
+                </td>
+                <td className="border-b border-[#eee] px-4 py-5 dark:border-strokedark">
+                  <button
+                    onClick={() => openDeleteModal(enquiry)}
+                    className="btn !border-none bg-red-600 p-3 text-gray-200 hover:bg-red-600/80"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting && currentEnquiry?._id === enquiry._id ? (
+                      <Spinner />
+                    ) : (
+                      <DeleteIcon />
+                    )}
+                  </button>
                 </td>
               </tr>
             ))}
@@ -152,7 +214,9 @@ const EnquiriesTable = () => {
         {(!filteredEnquiries || filteredEnquiries.length === 0) && (
           <div className="rounded-sm border border-stroke bg-white px-5 pb-2.5 pt-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
             <p className="text-center text-gray-500 dark:text-gray-400">
-              {searchQuery ? "No enquiries match your search." : "No enquiries found."}
+              {searchQuery
+                ? "No enquiries match your search."
+                : "No enquiries found."}
             </p>
           </div>
         )}
@@ -163,6 +227,32 @@ const EnquiriesTable = () => {
         totalPages={Math.ceil(totalItems / itemsPerPage)}
         onPageChange={handlePageChange}
       />
+
+      {isMessageModalOpen && currentEnquiry && (
+        <ReusableModal
+          onClose={closeMessageModal}
+          formContent={
+            <div className="p-4">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
+                {currentEnquiry.message}
+              </p>
+            </div>
+          }
+          title="Enquiry Message"
+        />
+      )}
+
+      {isDeleteModalOpen && currentEnquiry && (
+        <ReusableAlert
+          title="Confirm Deletion"
+          content={`Are you sure you want to delete the enquiry from "${currentEnquiry.name}"?`}
+          func={handleDelete}
+          isOpen={isDeleteModalOpen}
+          functionTitle="Delete"
+          buttonStyle="bg-red-600"
+          onClose={closeDeleteModal}
+        />
+      )}
     </div>
   );
 };
