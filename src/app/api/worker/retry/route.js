@@ -34,7 +34,3 @@ export async function POST(req) {
     return NextResponse.json({ error: "Server Error" }, { status: 500 });
   }
 }
-
-export const config = {
-  maxDuration: 10, // Serverless timeout
-};
