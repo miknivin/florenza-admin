@@ -130,6 +130,11 @@ export class OrderFilter {
     return this;
   }
 
+  select(fields: string): this {
+    this.query = this.query.select(fields);
+    return this;
+  }
+
   // Execute the query
   async execute() {
     return await this.query.exec();

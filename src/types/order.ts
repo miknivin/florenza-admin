@@ -17,13 +17,21 @@ export interface OrderItem {
   quantity: number;
   image: string;
   variant: string;
-  price: string; // 👈 Schema uses String, not Number
+  price: string; // Schema uses String, not Number
   product: string | Types.ObjectId; // ref: "products"
 }
 
 export interface PaymentInfo {
   id?: string;
   status?: string;
+}
+
+export interface OrderTracking {
+  Status?: string;
+  StatusDateTime?: Date;
+  StatusType?: string;
+  StatusLocation?: string;
+  Instructions?: string;
 }
 
 export interface Order {
@@ -40,8 +48,11 @@ export interface Order {
   couponApplied?: string; // default: "No"
   orderStatus: "Processing" | "Shipped" | "Delivered";
   orderNotes?: string;
-  deliveredAt?: Date;
   waybill?: string;
+  invoiceURL?: string;
+  delhiveryCurrentOrderStatus?: string; // New field for Delhivery status
+  orderTracking?: OrderTracking[]; // New field for tracking details
+  deliveredAt?: Date;
   createdAt: Date;
   updatedAt?: Date;
 }

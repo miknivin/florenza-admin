@@ -130,6 +130,7 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
+    delhiveryCurrentOrderStatus: { type: String, required: false },
     orderTracking: [
       {
         Status: {

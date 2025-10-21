@@ -14,20 +14,21 @@ import DeleteIcon from "../SvgIcons/DeleteIcon";
 import ReusableAlert from "@/utlis/alerts/ReusableAlert";
 import toast from "react-hot-toast";
 import SearchInput from "@/utlis/search/SearchInput";
-import Download from "../SvgIcons/Download";
+import CsvIcon from "../SvgIcons/CsvIcon";
+import Spinner from "../common/Spinner";
+import FilterIcon from "../SvgIcons/FilterIcon";
+
+import { Tooltip } from "@mui/material";
 import axios from "axios";
+import SyncIcon from "../SvgIcons/SyncIcons";
 
 async function trackDelhiveryShipment(
   waybill: any,
   refIds: any = "ORD1243244",
-): Promise<any> {
-  // Call your backend API route instead of Delhivery directly
+) {
   try {
     const response = await axios.get("/api/delhivery-status", {
-      params: {
-        waybill,
-        ref_ids: refIds,
-      },
+      params: { waybill, ref_ids: refIds },
     });
     return response.data;
   } catch (error: any) {
@@ -36,10 +37,10 @@ async function trackDelhiveryShipment(
 }
 
 const OrderTable = () => {
-  // Define all hooks at the top
   const { data, isLoading, isError } = useGetAdminOrdersQuery(null);
   const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -56,16 +57,28 @@ const OrderTable = () => {
 
       const statusPromises = data.orders.map(async (order: Order) => {
         if (!order.waybill) {
-          return { orderId: order._id, status: order.orderStatus, error: true };
+          return {
+            orderId: order._id,
+            status: order.delhiveryCurrentOrderStatus || order.orderStatus,
+            error: true,
+          };
         }
         try {
-          const trackResult = await trackDelhiveryShipment(order.waybill);
+          const trackResult = await trackDelhiveryShipment(
+            order.waybill,
+            order._id,
+          );
           const shipmentStatus =
             trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status ||
+            order.delhiveryCurrentOrderStatus ||
             order.orderStatus;
           return { orderId: order._id, status: shipmentStatus, error: false };
         } catch (error) {
-          return { orderId: order._id, status: order.orderStatus, error: true };
+          return {
+            orderId: order._id,
+            status: order.delhiveryCurrentOrderStatus || order.orderStatus,
+            error: true,
+          };
         }
       });
 
@@ -87,10 +100,32 @@ const OrderTable = () => {
     fetchAndUpdateStatus();
   }, [data?.orders]);
 
+  // Handle manual sync
+  const handleSyncOrders = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await axios.post(
+        process.env.NEXT_PUBLIC_VERCEL_URL
+          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/orders/sync-delhivery-orders`
+          : "http://localhost:3000/api/orders/sync-delhivery-orders",
+        {},
+        {
+          withCredentials: true, // Include credentials (cookies)
+        },
+      );
+      toast.success(response.data.message);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to sync orders");
+      console.error("Frontend sync error:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Handle search input
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    setCurrentPage(1); // Reset to first page on search
+    setCurrentPage(1);
   };
 
   // Filter orders based on search query
@@ -109,7 +144,7 @@ const OrderTable = () => {
     });
   }, [data?.orders, searchQuery]);
 
-  // Calculate paginated data from filtered orders
+  // Calculate paginated data
   const totalItems = filteredOrders.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -123,7 +158,7 @@ const OrderTable = () => {
   // Export to CSV
   const exportToCSV = () => {
     if (!filteredOrders || filteredOrders.length === 0) {
-      alert("No orders available to export!");
+      toast.error("No orders available to export!");
       return;
     }
 
@@ -143,40 +178,46 @@ const OrderTable = () => {
       { label: "Payment Method", value: "paymentMethod" },
       {
         label: "Order Status",
-        value: (order: Order) => orderStatuses[order._id] || order.orderStatus,
+        value: (order: Order) =>
+          orderStatuses[order._id] ||
+          order.delhiveryCurrentOrderStatus ||
+          order.orderStatus,
       },
       { label: "Date", value: "createdAt" },
     ];
 
-    const parser = new Parser({ fields });
-    const csv = parser.parse(filteredOrders);
+    try {
+      const parser = new Parser({ fields });
+      const csv = parser.parse(filteredOrders);
 
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "orders.csv";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-
-    setIsDownloading(false);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "orders.csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Orders exported successfully");
+    } catch (error) {
+      toast.error("Failed to export orders");
+      console.error("CSV export error:", error);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
-  // Open delete modal
   const openDeleteModal = (order: Order) => {
     setCurrentOrder(order);
     setIsDeleteModalOpen(true);
   };
 
-  // Close delete modal
   const closeDeleteModal = () => {
     setCurrentOrder(null);
     setIsDeleteModalOpen(false);
   };
 
-  // Handle order deletion
   const handleDelete = async () => {
     if (!currentOrder) return;
     try {
@@ -184,29 +225,39 @@ const OrderTable = () => {
       toast.success("Order deleted successfully");
       closeDeleteModal();
     } catch (error) {
-      toast.error("Error deleting");
+      toast.error("Error deleting order");
       console.error("Failed to delete order:", error);
     }
   };
 
-  // Early returns after hooks
+  // Early returns for loading and error states
   if (isLoading) {
-    return <p>Loading orders...</p>;
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Spinner />
+        <p className="ml-2 text-gray-500 dark:text-gray-400">
+          Loading orders...
+        </p>
+      </div>
+    );
   }
 
   if (isError) {
-    return <p>Error loading orders.</p>;
+    return (
+      <div className="text-center text-red-500 dark:text-red-400">
+        Error loading orders.
+      </div>
+    );
   }
 
   return (
     <div className="rounded-sm border border-stroke bg-white px-5 pb-2.5 pt-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
-      <div className="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark xl:pb-1">
-        <div className="gap-4">
-          <h4 className="mb-2 text-xl font-semibold text-black dark:text-white">
-            Orders
-          </h4>
-        </div>
+      <div className="mb-6">
+        <h4 className="text-xl font-semibold text-black dark:text-white">
+          Orders
+        </h4>
       </div>
+
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <SearchInput
           placeholder="Search by name, order ID, phone..."
@@ -216,21 +267,37 @@ const OrderTable = () => {
           <select
             defaultValue="8"
             onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            className="select rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+            className="rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
           >
-            <option disabled={true}>Select items per page</option>
+            <option disabled>Select items per page</option>
             <option value="5">5</option>
             <option value="8">8</option>
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
-          <button
-            onClick={exportToCSV}
-            className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50"
-            disabled={isDownloading}
-          >
-            {isDownloading ? "Downloading..." : "Export to CSV"}
-          </button>
+          <Tooltip title="Export as CSV" arrow>
+            <button
+              onClick={exportToCSV}
+              className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              disabled={isDownloading}
+            >
+              {isDownloading ? <Spinner /> : <CsvIcon />}
+            </button>
+          </Tooltip>
+          <Tooltip title="Sync Orders with Delhivery" arrow>
+            <button
+              onClick={handleSyncOrders}
+              className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
+              disabled={isSyncing}
+            >
+              {isSyncing ? <Spinner /> : <SyncIcon />}
+            </button>
+          </Tooltip>
+          <Tooltip title="Filter Orders" arrow>
+            <button className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50">
+              <FilterIcon />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -251,7 +318,7 @@ const OrderTable = () => {
                 Status
               </th>
               <th scope="col" className="px-6 py-3 text-center">
-                Payment method
+                Payment Method
               </th>
               <th scope="col" className="px-6 py-3 text-center">
                 Date
@@ -278,11 +345,11 @@ const OrderTable = () => {
                 </td>
                 <td className="px-6 py-4 text-center">₹{order.totalAmount}</td>
                 <td className="px-6 py-4 text-center">
-                  {orderStatuses[order._id] || order.orderStatus}
+                  {orderStatuses[order._id] ||
+                    order.delhiveryCurrentOrderStatus ||
+                    order.orderStatus}
                 </td>
-                <td className="px-6 py-4 text-center">
-                  {order?.paymentMethod}
-                </td>
+                <td className="px-6 py-4 text-center">{order.paymentMethod}</td>
                 <td className="px-6 py-4 text-center">
                   {new Date(order.createdAt).toLocaleDateString("en-GB", {
                     day: "2-digit",
@@ -300,7 +367,7 @@ const OrderTable = () => {
                     </Link>
                     <button
                       onClick={() => openDeleteModal(order)}
-                      className="btn border-none bg-red-600 p-3 text-gray-200 hover:bg-red-600/80"
+                      className="btn border-none bg-red-600 p-3 text-gray-200 hover:bg-red-600/80 disabled:opacity-50"
                       disabled={isDeleting}
                     >
                       <DeleteIcon />

@@ -1,12 +1,14 @@
-import { NextResponse, NextRequest } from "next/server"; // Import NextRequest here
-
+import { NextResponse, NextRequest } from "next/server";
 import { authorizeRoles, isAuthenticatedUser } from "@/middlewares/auth";
 import dbConnect from "@/lib/db/connection";
 import { OrderFilter } from "@/utlis/OrderFilter";
+import Product from "@/models/Products";
+import User from "@/models/User";
 
 export async function GET(req: NextRequest) {
-  // Changed parameter type to NextRequest
   try {
+    Product; // Ensure model is loaded (if needed for schema)
+    User; // Ensure model is loaded (if needed for schema)
     await dbConnect();
 
     // Authenticate the user
@@ -18,25 +20,28 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Authorize admin role
     authorizeRoles(user, "admin");
 
     // Extract filter options from request
     const filterOptions = OrderFilter.extractFilterOptions(req);
 
-    // Apply filters and get orders
+    // Apply filters and exclude orderTracking
     const orderFilter = new OrderFilter(filterOptions);
-    const orders = await orderFilter.getFilteredOrders();
+    const orders = await orderFilter
+      .select("-orderTracking")
+      .getFilteredOrders();
 
     if (!orders || orders.length === 0) {
-      // Simplified check
       return NextResponse.json(
-        { success: true, orders: [], message: "No orders found" }, // Return empty array for consistency
+        { success: true, orders: [], message: "No orders found" },
         { status: 200 },
       );
     }
 
     return NextResponse.json({ success: true, orders }, { status: 200 });
-  } catch (error:any) {
+  } catch (error: any) {
+    console.error("Error fetching orders:", error);
     return NextResponse.json(
       { success: false, message: error.message },
       { status: 500 },

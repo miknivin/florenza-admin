@@ -88,7 +88,6 @@ export async function POST(
           seller_name: "Florenza Italiya", // Fixed seller name
           seller_inv: `INV${order._id.toString()}`, // Unique invoice based on order ID
           quantity: totalQuantity.toString(),
-          waybill: "", // Delhivery will assign
           shipment_width: "100", // 10 cm, typical for a small perfume box (in mm? adjust if needed)
           shipment_height: "150", // 15 cm, typical for a small perfume box (in mm? adjust if needed)
           shipment_length: "100", // Added length for completeness (adjust as needed)
@@ -120,6 +119,7 @@ export async function POST(
       DELHIVERY_API_TOKEN,
       shipmentData,
     );
+    console.log(delhiveryResponse);
 
     // Extract waybill from response
     const waybill = delhiveryResponse.packages?.[0]?.waybill;

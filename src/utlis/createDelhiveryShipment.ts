@@ -67,14 +67,11 @@ async function createDelhiveryShipment(token: any, shipmentData: any) {
     const responseData = response.data;
 
     // Log success
-    console.log(
-      `Shipment created successfully for order: ${
-        shipmentData.shipments[0]?.order
-      }, Waybill: ${responseData.packages?.[0]?.waybill || "N/A"}`,
-    );
 
     // Validate response
     if (!responseData.success) {
+      console.log(JSON.stringify(responseData));
+
       throw new Error(
         responseData.error || "Delhivery API returned unsuccessful response",
       );
