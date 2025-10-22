@@ -6,7 +6,7 @@ import {
 } from "@/redux/api/orderApi";
 import { Order } from "@/types/order";
 import Link from "next/link";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Parser } from "json2csv";
 import PaginationComponent from "@/utlis/pagination/PaginationComponent";
 import PreviewIcon from "../SvgIcons/PreviewIcon";
@@ -17,24 +17,9 @@ import SearchInput from "@/utlis/search/SearchInput";
 import CsvIcon from "../SvgIcons/CsvIcon";
 import Spinner from "../common/Spinner";
 import FilterIcon from "../SvgIcons/FilterIcon";
-
+import SyncIcon from "../SvgIcons/SyncIcons";
 import { Tooltip } from "@mui/material";
 import axios from "axios";
-import SyncIcon from "../SvgIcons/SyncIcons";
-
-async function trackDelhiveryShipment(
-  waybill: any,
-  refIds: any = "ORD1243244",
-) {
-  try {
-    const response = await axios.get("/api/delhivery-status", {
-      params: { waybill, ref_ids: refIds },
-    });
-    return response.data;
-  } catch (error: any) {
-    throw new Error(`Failed to track shipment: ${error.message}`);
-  }
-}
 
 const OrderTable = () => {
   const { data, isLoading, isError } = useGetAdminOrdersQuery(null);
@@ -46,59 +31,6 @@ const OrderTable = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [orderStatuses, setOrderStatuses] = useState<{ [key: string]: string }>(
-    {},
-  );
-
-  // Fetch and update statuses for all orders
-  useEffect(() => {
-    const fetchAndUpdateStatus = async () => {
-      if (!data?.orders || data.orders.length === 0) return;
-
-      const statusPromises = data.orders.map(async (order: Order) => {
-        if (!order.waybill) {
-          return {
-            orderId: order._id,
-            status: order.delhiveryCurrentOrderStatus || order.orderStatus,
-            error: true,
-          };
-        }
-        try {
-          const trackResult = await trackDelhiveryShipment(
-            order.waybill,
-            order._id,
-          );
-          const shipmentStatus =
-            trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status ||
-            order.delhiveryCurrentOrderStatus ||
-            order.orderStatus;
-          return { orderId: order._id, status: shipmentStatus, error: false };
-        } catch (error) {
-          return {
-            orderId: order._id,
-            status: order.delhiveryCurrentOrderStatus || order.orderStatus,
-            error: true,
-          };
-        }
-      });
-
-      try {
-        const results = await Promise.all(statusPromises);
-        const newStatuses = results.reduce(
-          (acc: { [key: string]: string }, result) => {
-            acc[result.orderId] = result.status;
-            return acc;
-          },
-          {},
-        );
-        setOrderStatuses(newStatuses);
-      } catch (error) {
-        console.error("Error fetching statuses:", error);
-      }
-    };
-
-    fetchAndUpdateStatus();
-  }, [data?.orders]);
 
   // Handle manual sync
   const handleSyncOrders = async () => {
@@ -106,8 +38,8 @@ const OrderTable = () => {
     try {
       const response = await axios.post(
         process.env.NEXT_PUBLIC_VERCEL_URL
-          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/orders/sync-delhivery-orders`
-          : "http://localhost:3000/api/orders/sync-delhivery-orders",
+          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/frontend/sync-delhivery-orders`
+          : "http://localhost:3000/api/frontend/sync-delhivery-orders",
         {},
         {
           withCredentials: true, // Include credentials (cookies)
@@ -179,9 +111,7 @@ const OrderTable = () => {
       {
         label: "Order Status",
         value: (order: Order) =>
-          orderStatuses[order._id] ||
-          order.delhiveryCurrentOrderStatus ||
-          order.orderStatus,
+          order.delhiveryCurrentOrderStatus || order.orderStatus,
       },
       { label: "Date", value: "createdAt" },
     ];
@@ -233,7 +163,7 @@ const OrderTable = () => {
   // Early returns for loading and error states
   if (isLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
+      <div className="flex h-64 flex-col items-center justify-center">
         <Spinner />
         <p className="ml-2 text-gray-500 dark:text-gray-400">
           Loading orders...
@@ -345,9 +275,7 @@ const OrderTable = () => {
                 </td>
                 <td className="px-6 py-4 text-center">₹{order.totalAmount}</td>
                 <td className="px-6 py-4 text-center">
-                  {orderStatuses[order._id] ||
-                    order.delhiveryCurrentOrderStatus ||
-                    order.orderStatus}
+                  {order.delhiveryCurrentOrderStatus || order.orderStatus}
                 </td>
                 <td className="px-6 py-4 text-center">{order.paymentMethod}</td>
                 <td className="px-6 py-4 text-center">
