@@ -38,8 +38,8 @@ const OrderTable = () => {
     try {
       const response = await axios.post(
         process.env.NEXT_PUBLIC_VERCEL_URL
-          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/frontend/sync-delhivery-orders`
-          : "http://localhost:3000/api/frontend/sync-delhivery-orders",
+          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/orders/sync-delhivery-orders`
+          : "http://localhost:3000/api/orders/sync-delhivery-orders",
         {},
         {
           withCredentials: true, // Include credentials (cookies)
