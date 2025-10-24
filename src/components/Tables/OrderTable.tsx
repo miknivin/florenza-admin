@@ -3,10 +3,11 @@
 import {
   useGetAdminOrdersQuery,
   useDeleteOrderMutation,
+  useSyncDelhiveryOrdersMutation,
 } from "@/redux/api/orderApi";
 import { Order } from "@/types/order";
 import Link from "next/link";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Parser } from "json2csv";
 import PaginationComponent from "@/utlis/pagination/PaginationComponent";
 import PreviewIcon from "../SvgIcons/PreviewIcon";
@@ -19,71 +20,68 @@ import Spinner from "../common/Spinner";
 import FilterIcon from "../SvgIcons/FilterIcon";
 import SyncIcon from "../SvgIcons/SyncIcons";
 import { Tooltip } from "@mui/material";
-import axios from "axios";
+import Offcanvas from "../common/shared/ReusableOffCanvas";
+import FilterForm from "../orders/OrderFilterForm";
 
 const OrderTable = () => {
-  const { data, isLoading, isError } = useGetAdminOrdersQuery(null);
-  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [filterOptions, setFilterOptions] = useState<{ search?: string; [key: string]: any }>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(8);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [isFilterOffCanvasOpen, setIsFilterOffCanvasOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  // Handle manual sync
+  const { data, isLoading, isError } = useGetAdminOrdersQuery(filterOptions);
+  const [deleteOrder, { isLoading: isDeleting }] = useDeleteOrderMutation();
+  const [syncDelhiveryOrders, { isLoading: isSyncing }] =
+    useSyncDelhiveryOrdersMutation();
+
+  // Check if any filter options are applied
+  const hasActiveFilters = Object.keys(filterOptions).length > 0;
+
+  // Handle sync with Delhivery
   const handleSyncOrders = async () => {
-    setIsSyncing(true);
     try {
-      const response = await axios.post(
-        process.env.NEXT_PUBLIC_VERCEL_URL
-          ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}/api/orders/sync-delhivery-orders`
-          : "http://localhost:3000/api/orders/sync-delhivery-orders",
-        {},
-        {
-          withCredentials: true, // Include credentials (cookies)
-        },
-      );
-      toast.success(response.data.message);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Failed to sync orders");
-      console.error("Frontend sync error:", error);
-    } finally {
-      setIsSyncing(false);
+      const response = await syncDelhiveryOrders({}).unwrap();
+      toast.success(response.message);
+    } catch (error) {
+      // Error handling is managed in the mutation's onQueryStarted
     }
   };
 
-  // Handle search input
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
+  // Handle search input from SearchInput component
+  const handleSearch = (query: any) => {
+    setFilterOptions((prev) => ({ ...prev, search: query || undefined }));
     setCurrentPage(1);
   };
 
-  // Filter orders based on search query
-  const filteredOrders = useMemo(() => {
-    if (!data?.orders || !searchQuery) return data?.orders || [];
-    const queryLower = searchQuery.toLowerCase();
-    return data.orders.filter((order: Order) => {
-      const orderId = order._id.toLowerCase();
-      const fullName = order.shippingInfo.fullName?.toLowerCase() || "";
-      const phoneNo = order.shippingInfo.phoneNo.toLowerCase() || "";
-      return (
-        orderId.includes(queryLower) ||
-        fullName.includes(queryLower) ||
-        phoneNo.includes(queryLower)
-      );
-    });
-  }, [data?.orders, searchQuery]);
+  // Handle filter form apply
+  const handleApplyFilters = (filters: any) => {
+    setFilterOptions(filters);
+    setCurrentPage(1);
+    setIsFilterOffCanvasOpen(false);
+  };
+
+  // Toggle off-canvas
+  const toggleFilterOffCanvas = () => {
+    setIsFilterOffCanvasOpen((prev) => !prev);
+  };
+
+  // Close off-canvas
+  const closeFilterOffCanvas = () => {
+    setIsFilterOffCanvasOpen(false);
+  };
 
   // Calculate paginated data
+  const filteredOrders = data?.orders || [];
   const totalItems = filteredOrders.length;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
   // Handle page change
-  const handlePageChange = (page: number) => {
+  const handlePageChange = (page: any) => {
     setCurrentPage(page);
   };
 
@@ -110,7 +108,7 @@ const OrderTable = () => {
       { label: "Payment Method", value: "paymentMethod" },
       {
         label: "Order Status",
-        value: (order: Order) =>
+        value: (order: any) =>
           order.delhiveryCurrentOrderStatus || order.orderStatus,
       },
       { label: "Date", value: "createdAt" },
@@ -138,7 +136,7 @@ const OrderTable = () => {
     }
   };
 
-  const openDeleteModal = (order: Order) => {
+  const openDeleteModal = (order: any) => {
     setCurrentOrder(order);
     setIsDeleteModalOpen(true);
   };
@@ -151,7 +149,7 @@ const OrderTable = () => {
   const handleDelete = async () => {
     if (!currentOrder) return;
     try {
-      await deleteOrder(currentOrder._id).unwrap();
+      await deleteOrder(currentOrder!._id).unwrap();
       toast.success("Order deleted successfully");
       closeDeleteModal();
     } catch (error) {
@@ -223,11 +221,22 @@ const OrderTable = () => {
               {isSyncing ? <Spinner /> : <SyncIcon />}
             </button>
           </Tooltip>
-          <Tooltip title="Filter Orders" arrow>
-            <button className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50">
-              <FilterIcon />
-            </button>
-          </Tooltip>
+          <div className="relative">
+            <Tooltip title="Filter Orders" arrow>
+              <button
+                onClick={toggleFilterOffCanvas}
+                className="rounded bg-primary px-4 py-2 text-sm text-white hover:bg-primary/70 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <FilterIcon />
+              </button>
+            </Tooltip>
+            {hasActiveFilters && (
+              <span className="absolute -right-1 -top-1 flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -259,7 +268,7 @@ const OrderTable = () => {
             </tr>
           </thead>
           <tbody>
-            {paginatedOrders?.map((order: Order) => (
+            {paginatedOrders?.map((order: any) => (
               <tr
                 key={order._id}
                 className="border-b border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-600"
@@ -309,7 +318,7 @@ const OrderTable = () => {
         {(!filteredOrders || filteredOrders.length === 0) && (
           <div className="rounded-sm border border-stroke bg-white px-5 pb-2.5 pt-6 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
             <p className="text-center text-gray-500 dark:text-gray-400">
-              {searchQuery
+              {filterOptions?.search
                 ? "No orders match your search."
                 : "No orders found."}
             </p>
@@ -332,6 +341,16 @@ const OrderTable = () => {
           onClose={closeDeleteModal}
           functionTitle="Delete"
           buttonStyle="bg-red-600"
+        />
+      )}
+
+      <Offcanvas isOpen={isFilterOffCanvasOpen} onClose={closeFilterOffCanvas}>
+        <FilterForm onApply={handleApplyFilters} />
+      </Offcanvas>
+      {isFilterOffCanvasOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black bg-opacity-50"
+          onClick={closeFilterOffCanvas}
         />
       )}
     </div>

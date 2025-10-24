@@ -33,7 +33,33 @@ export const orderApi = createApi({
       },
     }),
     getAdminOrders: builder.query({
-      query: () => `orders/admin/getAllOrders`,
+      query: (filterOptions) => {
+        const params = new URLSearchParams();
+        if (filterOptions) {
+          if (filterOptions.status)
+            params.append("status", filterOptions.status);
+          if (filterOptions.paymentMethod)
+            params.append("paymentMethod", filterOptions.paymentMethod);
+          if (filterOptions.startDate)
+            params.append("startDate", filterOptions.startDate);
+          if (filterOptions.endDate)
+            params.append("endDate", filterOptions.endDate);
+          if (filterOptions.userId)
+            params.append("userId", filterOptions.userId);
+          if (filterOptions.search)
+            params.append("search", filterOptions.search);
+          if (filterOptions.minTotal)
+            params.append("minTotal", filterOptions.minTotal.toString());
+          if (filterOptions.maxTotal)
+            params.append("maxTotal", filterOptions.maxTotal.toString());
+          if (filterOptions.hasWaybill !== undefined)
+            params.append("hasWaybill", filterOptions.hasWaybill.toString());
+        }
+        return {
+          url: `/orders/admin/getAllOrders?${params.toString()}`,
+          method: "GET",
+        };
+      },
       providesTags: ["AdminOrders"],
     }),
     updateOrder: builder.mutation({
@@ -168,6 +194,27 @@ export const orderApi = createApi({
         }
       },
     }),
+    syncDelhiveryOrders: builder.mutation({
+      query: () => ({
+        url: "/orders/sync-delhivery-orders",
+        method: "POST",
+        body: {},
+      }),
+      invalidatesTags: ["AdminOrders"], // Trigger refetch of getAdminOrders
+      transformResponse: (response) => ({
+        success: response.success,
+        message: response.message,
+      }),
+      onQueryStarted: async (arg, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+          toast.success(data.message); // Display success message
+        } catch (error) {
+          toast.error("Failed to sync orders"); // Display error message
+          console.error("Error syncing Delhivery orders:", error);
+        }
+      },
+    }),
   }),
 });
 
@@ -191,4 +238,5 @@ export const {
   useDeleteSessionOrderByIdMutation,
   useSearchSessionStartedOrdersQuery,
   useCreateDelhiveryOrderMutation,
+  useSyncDelhiveryOrdersMutation,
 } = orderApi;

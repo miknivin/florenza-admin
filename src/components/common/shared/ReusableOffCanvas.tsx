@@ -12,7 +12,7 @@ const Offcanvas: React.FC<OffcanvasProps> = ({ children, isOpen, onClose }) => {
   return (
     <div
       id="offcanvas"
-      className={`fixed right-0 top-0 z-40 h-screen overflow-y-auto p-4 transition-transform ${
+      className={`fixed right-0 top-0 z-[99999999] h-screen overflow-y-auto p-4 transition-transform ${
         isOpen ? "translate-x-0" : "translate-x-full"
       } w-80 bg-white dark:bg-gray-800`}
       tabIndex={-1}

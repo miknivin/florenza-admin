@@ -24,11 +24,26 @@ export class OrderFilter {
   }
 
   // Filter by order status
+  // Filter by order status (prefers delhiveryCurrentOrderStatus if it exists)
   filterByStatus(): this {
     if (this.filterOptions.status) {
-      this.query = this.query
-        .where("orderStatus")
-        .equals(this.filterOptions.status);
+      const status = this.filterOptions.status.toLowerCase();
+
+      this.query = this.query.where({
+        $or: [
+          {
+            delhiveryCurrentOrderStatus: {
+              $regex: new RegExp(`^${status}$`, "i"),
+            },
+          },
+          {
+            $and: [
+              { delhiveryCurrentOrderStatus: { $exists: false } },
+              { orderStatus: { $regex: new RegExp(`^${status}$`, "i") } },
+            ],
+          },
+        ],
+      });
     }
     return this;
   }
@@ -156,7 +171,6 @@ export class OrderFilter {
 
   // Static method to extract filter options from request
   static extractFilterOptions(req: NextRequest): FilterOptions {
-    // Changed type to NextRequest
     const url = new URL(req.url);
     const filterOptions: FilterOptions = {};
 
