@@ -18,7 +18,7 @@ interface ProductItemProps {
 }
 
 const ProductItem: React.FC<ProductItemProps> = ({ product, waybill }) => {
-  const { name, quantity, image, price } = product;
+  const { name, quantity, image, price, variant } = product;
   // uploadedImage and customNameToPrint are not in OrderItem type, so handle gracefully
   // @ts-ignore
   const uploadedImage = product.uploadedImage || [];
@@ -44,7 +44,6 @@ const ProductItem: React.FC<ProductItemProps> = ({ product, waybill }) => {
   //   };
   // }, []);
 
-
   // Fetch Delhivery status if waybill is provided
   useEffect(() => {
     const fetchStatus = async () => {
@@ -52,7 +51,8 @@ const ProductItem: React.FC<ProductItemProps> = ({ product, waybill }) => {
       const token = ""; // TODO: Set your Delhivery API token here
       try {
         const trackResult = await trackDelhiveryShipment(token, waybill);
-        const shipmentStatus = trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status;
+        const shipmentStatus =
+          trackResult?.ShipmentData?.[0]?.Shipment?.Status?.Status;
         setDelhiveryStatus(shipmentStatus || "Not Available");
       } catch {
         setDelhiveryStatus("Error fetching status");
@@ -71,16 +71,19 @@ const ProductItem: React.FC<ProductItemProps> = ({ product, waybill }) => {
         <img className="hidden w-full md:block" src={image} alt={name} />
       </div>
       <div className="flex w-full flex-col items-start justify-between space-y-4 border-b border-gray-200 pb-8 dark:border-gray-700 md:flex-row md:space-y-0">
-    <div className="flex w-full flex-col items-start justify-start space-y-8">
-        {/* Delhivery status display */}
-        {waybill && (
-          <div className="mt-2">
-            {/* <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Delhivery Status: </span>
+        <div className="flex w-full flex-col items-start justify-start space-y-3">
+          {/* Delhivery status display */}
+          {waybill && (
+            <div className="mt-2">
+              {/* <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Delhivery Status: </span>
             <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">{delhiveryStatus}</span> */}
-          </div>
-        )}
+            </div>
+          )}
           <h3 className="line-clamp-3 text-ellipsis whitespace-break-spaces text-xl font-semibold leading-6  text-gray-800 dark:text-gray-100 xl:text-2xl">
             {name}
+          </h3>
+          <h3 className="line-clamp-3 text-ellipsis whitespace-break-spaces text-sm font-normal leading-6  text-gray-800 dark:text-gray-100 xl:text-xl">
+            {variant || ""}
           </h3>
           {customNameToPrint && (
             <p className=" text-xl font-medium">{customNameToPrint}</p>
@@ -103,8 +106,6 @@ const ProductItem: React.FC<ProductItemProps> = ({ product, waybill }) => {
               <div
                 className="dropdown-content absolute z-[10] mt-2 w-56 rounded-box bg-base-100 p-2 shadow-lg"
                 onClick={(e) => e.stopPropagation()}
-
-                
               >
                 {uploadedImage && uploadedImage.length > 0 ? (
                   <div>
